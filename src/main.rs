@@ -1,0 +1,84 @@
+use std::fmt;
+
+#[derive(Debug, PartialEq)]
+enum Token<'a> {
+    Int(u64),
+    Name(&'a str),
+    Other(char)
+}
+
+impl fmt::Display for Token<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
+fn tokenize<'a>(stream: &'a mut &str) -> Vec<Token<'a>> {
+    let mut tokens = vec![];
+    let mut bytes = stream.as_bytes().iter().enumerate();
+    while let Some((i, &byte)) = bytes.next() {
+        match byte {
+            b'0'..=b'9' => {
+                let mut val = 0;
+                val *= 10;
+                val += byte as u64 - '0' as u64;
+                while let Some((j, &num)) = bytes.next() {
+                    if (num as char).is_digit(10) {
+                        val *= 10;
+                        val = val + (num as u64 - '0' as u64);
+                        if j == stream.len() - 1 {
+                            tokens.push(Token::Int(val));
+                            break;
+                        }
+                        if !&stream.chars().nth(j + 1).unwrap().is_digit(10) {
+                            tokens.push(Token::Int(val));
+                            break;
+                        }
+                    } else {
+                        tokens.push(Token::Int(val));
+                        break;
+                    }
+                }
+            },
+            b'A'..=b'z' => {
+                while let Some((j, &alpha)) = bytes.next() {
+                    if (alpha as char).is_alphabetic() | (alpha as char).is_digit(10) {
+                        if j == stream.len() - 1 {
+                            if &stream.chars().nth(j).unwrap().is_alphabetic() | &stream.chars().nth(j).unwrap().is_digit(10) {
+                                tokens.push(Token::Name(&stream[i..j + 1]));
+                            }
+                            break;
+                        }
+                        if !&stream.chars().nth(j + 1).unwrap().is_alphabetic() & !&stream.chars().nth(j + 1).unwrap().is_digit(10) {
+                            tokens.push(Token::Name(&stream[i..j + 1]));
+                            break;
+                        }
+                    } else {
+                        tokens.push(Token::Name(&stream[i..j]));
+                        break;
+                    }
+                }
+            },
+            _ => {
+                tokens.push(Token::Other(byte as char))
+            }
+        }
+    }
+    tokens
+}
+
+fn main() {
+    let mut stream = "+()_A1,23+!FOO!994/a25*t1";
+    let tokens = tokenize(&mut stream);
+    println!("{:?}", tokens);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_lexer() {
+
+    }
+}
