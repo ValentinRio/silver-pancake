@@ -1,4 +1,25 @@
 use std::fmt;
+use std::ptr;
+
+struct InternStr<'a> {
+    len: usize,
+    str: &'a str
+}
+
+fn str_intern_range<'a>(interns: & mut Vec<InternStr<'a>>, str: &'a str) -> &'a str {
+    let len = str.len();
+    for i in 0..interns.len() {
+        if (interns[i].len == len) & (interns[i].str == str) {
+            return &interns[i].str;
+        }
+    }
+    let intern = InternStr {
+        len: str.len(),
+        str: &str
+    };
+    interns.push(intern);
+    &str
+}
 
 #[derive(Debug, PartialEq)]
 enum Token<'a> {
@@ -68,9 +89,7 @@ fn tokenize<'a>(stream: &'a mut &str) -> Vec<Token<'a>> {
 }
 
 fn main() {
-    let mut stream = "+()_A1,23+!FOO!994/a25*t1";
-    let tokens = tokenize(&mut stream);
-    println!("{:?}", tokens);
+    
 }
 
 #[cfg(test)]
@@ -79,6 +98,22 @@ mod tests {
 
     #[test]
     fn test_lexer() {
+        let mut stream = "+()_A1,23+!FOO!994/a25*t1";
+        let tokens = tokenize(&mut stream);
+        assert!(tokens.len() == 15);
+    }
 
+    #[test]
+    fn test_str_intern() {
+        let x = "hello";
+        let y = "hello";
+        assert!(!ptr::eq(&x, &y));
+        let mut interns: Vec<InternStr> = Vec::new();
+        let px = str_intern_range(&mut interns, x);
+        let py = str_intern_range(&mut interns, y);
+        assert!(ptr::eq(px, py));
+        let z = "hello!";
+        let pz = str_intern_range(&mut interns, z);
+        assert!(!ptr::eq(pz, px));
     }
 }
