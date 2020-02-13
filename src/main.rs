@@ -88,6 +88,11 @@ fn tokenize<'a>(stream: &'a mut &str) -> Vec<Token<'a>> {
     tokens
 }
 
+fn parse_expr_str(expr: &str) -> i32 {
+    println!("{}", expr);
+    0
+}
+
 fn main() {
     
 }
@@ -104,7 +109,7 @@ mod tests {
     }
 
     #[test]
-    fn test_str_intern() {
+    fn test_string_interning() {
         let x = "hello";
         let y = "hello";
         assert!(!ptr::eq(&x, &y));
@@ -115,5 +120,16 @@ mod tests {
         let z = "hello!";
         let pz = str_intern_range(&mut interns, z);
         assert!(!ptr::eq(pz, px));
+    }
+
+    macro_rules! test_expr {
+        ($x:expr) => {
+            assert!(parse_expr_str(stringify!($x)) == $x);
+        }
+    }
+
+    #[test]
+    fn test_parser() {
+        test_expr!(1 + 1);
     }
 }
