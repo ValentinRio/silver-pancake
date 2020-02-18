@@ -3,10 +3,10 @@ use std::ptr;
 
 struct InternStr<'a> {
     len: usize,
-    str: &'a str
+    str: &'a str,
 }
 
-fn str_intern_range<'a>(interns: & mut Vec<InternStr<'a>>, str: &'a str) -> &'a str {
+fn str_intern_range<'a>(interns: &mut Vec<InternStr<'a>>, str: &'a str) -> &'a str {
     let len = str.len();
     for i in 0..interns.len() {
         if (interns[i].len == len) & (interns[i].str == str) {
@@ -15,7 +15,7 @@ fn str_intern_range<'a>(interns: & mut Vec<InternStr<'a>>, str: &'a str) -> &'a 
     }
     let intern = InternStr {
         len: str.len(),
-        str: &str
+        str: &str,
     };
     interns.push(intern);
     &str
@@ -25,7 +25,7 @@ fn str_intern_range<'a>(interns: & mut Vec<InternStr<'a>>, str: &'a str) -> &'a 
 enum Token<'a> {
     Int(u64),
     Name(&'a str),
-    Other(char)
+    Other(char),
 }
 
 impl fmt::Display for Token<'_> {
@@ -38,12 +38,12 @@ fn tokenize<'a>(s: &'a mut &str) -> Vec<Token<'a>> {
     let mut tokens = vec![];
     let mut iter = s.chars().enumerate().peekable();
 
-    while let Some((i, c)) = iter.peek() {
-        match *c as u8 {
+    while let Some((i, c)) = iter.next() {
+        match c as u8 {
             b'0'..=b'9' => {
                 let mut val = 0;
                 val *= 10;
-                val += *c as u64 - '0' as u64;
+                val += c as u64 - '0' as u64;
                 while let Some((_j, n)) = iter.peek() {
                     if n.is_digit(10) {
                         val *= 10;
@@ -51,25 +51,24 @@ fn tokenize<'a>(s: &'a mut &str) -> Vec<Token<'a>> {
                         iter.next();
                     } else {
                         tokens.push(Token::Int(val));
-                        iter.next();
                         break;
                     }
                 }
-            },
+            }
             b'A'..=b'z' => {
-                while let Some((j, a)) = iter.peek() {
+                let mut k = i.clone() + 1;
+                while let Some((_j, a)) = iter.peek() {
                     if a.is_alphabetic() | a.is_digit(10) {
+                        k += 1;
                         iter.next();
                     } else {
-                        tokens.push(Token::Name(s));
-                        iter.next();
                         break;
                     }
                 }
-            },
+                tokens.push(Token::Name(&s[i as usize..k as usize]));
+            }
             _ => {
-                tokens.push(Token::Other(*c));
-                iter.next();
+                tokens.push(Token::Other(c));
             }
         }
     }
@@ -78,21 +77,10 @@ fn tokenize<'a>(s: &'a mut &str) -> Vec<Token<'a>> {
 
 fn parse_expr_str(expr: &str) -> i32 {
     println!("{}", expr);
-    let mut stream = expr;
-    let tokens = tokenize(&mut stream);
-    let mut iter = tokens.iter();
-    println!("{:?}", iter.next());
-    println!("{:?}", iter.next());
-    println!("{:?}", iter.next());
-    println!("{:?}", iter.next());
-    println!("{:?}", iter.next());
-    println!("{:?}", iter.next());
     2
 }
 
-fn main() {
-    
-}
+fn main() {}
 
 #[cfg(test)]
 mod tests {
@@ -103,7 +91,7 @@ mod tests {
         let mut stream = "+()_A1,23+!FOO!994 / a25*t1 1 + 1 ";
         let tokens = tokenize(&mut stream);
         println!("{:?}", tokens);
-        assert!(tokens.len() == 23);
+        assert!(tokens.len() == 24);
     }
 
     #[test]
@@ -123,7 +111,7 @@ mod tests {
     macro_rules! test_expr {
         ($x:expr) => {
             assert!(parse_expr_str(stringify!($x)) == $x);
-        }
+        };
     }
 
     #[test]
