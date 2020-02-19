@@ -75,45 +75,102 @@ fn tokenize<'a>(s: &'a mut &str) -> Vec<Token<'a>> {
     tokens
 }
 
+fn parse_expr3<'a, I>(tokens: &mut I) -> i32
+where
+    I: Iterator<Item = &'a Token<'a>>,
+{
+    match tokens.next().unwrap() {
+        Token::Int(n) => {
+            tokens.next();
+            *n as i32
+        }
+        Token::Other('(') => {
+            let token = tokens.next();
+            let val = parse_expr(tokens);
+            match token.unwrap() {
+                Token::Other(')') => {
+                    tokens.next();
+                }
+                _ => {}
+            }
+            val
+        }
+        _ => panic!("Expected integer or ("),
+    }
+}
+
+fn parse_expr2<'a, I>(tokens: &mut I) -> i32
+where
+    I: Iterator<Item = &'a Token<'a>>,
+{
+    match tokens.next().unwrap() {
+        Token::Other('+') => {
+            tokens.next();
+            parse_expr2(tokens)
+        }
+        Token::Other('-') => {
+            tokens.next();
+            -parse_expr2(tokens)
+        }
+        _ => parse_expr3(tokens),
+    }
+}
+
+fn parse_expr1<'a, I>(tokens: &mut I) -> i32
+where
+    I: Iterator<Item = &'a Token<'a>>,
+{
+    let mut val = parse_expr2(tokens);
+    match tokens.next().unwrap() {
+        Token::Other('*') => {
+            let rval = parse_expr2(tokens);
+            val *= rval;
+        }
+        Token::Other('/') => {
+            let rval = parse_expr2(tokens);
+            val /= rval;
+        }
+        _ => {}
+    }
+    val
+}
+
+fn parse_expr0<'a, I>(tokens: &mut I) -> i32
+where
+    I: Iterator<Item = &'a Token<'a>>,
+{
+    let mut val = parse_expr1(tokens);
+    match tokens.next().unwrap() {
+        Token::Other('+') => {
+            let rval = parse_expr1(tokens);
+            val += rval;
+        }
+        Token::Other('-') => {
+            let rval = parse_expr1(tokens);
+            val -= rval;
+        }
+        _ => {}
+    }
+    val
+}
+
+fn parse_expr<'a, I>(tokens: &mut I) -> i32
+where
+    I: Iterator<Item = &'a Token<'a>>,
+{
+    parse_expr0(tokens)
+}
+
 fn parse_expr_str(expr: &str) -> i32 {
     let mut stream = expr;
     let tokens = tokenize(&mut stream);
     let mut iter = tokens.iter();
-
-    let mut next = || iter.next();
-
-    fn parse0<'a, F>(next: &mut F) -> i32
-    where
-        F: FnMut() -> Option<&'a Token<'a>>,
-    {
-        let val = parse1(next);
-        0
-    };
-    fn parse1<'a, F>(next: &mut F) -> i32
-    where
-        F: FnMut() -> Option<&'a Token<'a>>,
-    {
-        let val = parse2(next);
-        0
-    };
-    fn parse2<'a, F>(next: &mut F) -> i32
-    where
-        F: FnMut() -> Option<&'a Token<'a>>,
-    {
-        if next() == Some(&Token::Other('+')) {
-            parse2(next);
-        }
-        0
-    };
-    fn parse3<F>(next: &mut F) -> i32 {
-        0
-    };
-    parse0(&mut next);
-
-    2
+    parse_expr(&mut iter)
 }
 
-fn main() {}
+fn main() {
+    parse_expr_str("1+1");
+}
 
 #[cfg(test)]
 mod tests {
