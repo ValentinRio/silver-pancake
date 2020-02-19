@@ -50,10 +50,10 @@ fn tokenize<'a>(s: &'a mut &str) -> Vec<Token<'a>> {
                         val = val + (*n as u64 - '0' as u64);
                         iter.next();
                     } else {
-                        tokens.push(Token::Int(val));
                         break;
                     }
                 }
+                tokens.push(Token::Int(val));
             }
             b'A'..=b'z' => {
                 let mut k = i.clone() + 1;
@@ -76,7 +76,40 @@ fn tokenize<'a>(s: &'a mut &str) -> Vec<Token<'a>> {
 }
 
 fn parse_expr_str(expr: &str) -> i32 {
-    println!("{}", expr);
+    let mut stream = expr;
+    let tokens = tokenize(&mut stream);
+    let mut iter = tokens.iter();
+
+    let mut next = || iter.next();
+
+    fn parse0<'a, F>(next: &mut F) -> i32
+    where
+        F: FnMut() -> Option<&'a Token<'a>>,
+    {
+        let val = parse1(next);
+        0
+    };
+    fn parse1<'a, F>(next: &mut F) -> i32
+    where
+        F: FnMut() -> Option<&'a Token<'a>>,
+    {
+        let val = parse2(next);
+        0
+    };
+    fn parse2<'a, F>(next: &mut F) -> i32
+    where
+        F: FnMut() -> Option<&'a Token<'a>>,
+    {
+        if next() == Some(&Token::Other('+')) {
+            parse2(next);
+        }
+        0
+    };
+    fn parse3<F>(next: &mut F) -> i32 {
+        0
+    };
+    parse0(&mut next);
+
     2
 }
 
@@ -88,10 +121,10 @@ mod tests {
 
     #[test]
     fn test_lexer() {
-        let mut stream = "+()_A1,23+!FOO!994 / a25*t1 1 + 1 ";
+        let mut stream = "+()_A1,23+!FOO!994 / a25*t1 1 + 1";
         let tokens = tokenize(&mut stream);
         println!("{:?}", tokens);
-        assert!(tokens.len() == 24);
+        assert!(tokens.len() == 23);
     }
 
     #[test]
