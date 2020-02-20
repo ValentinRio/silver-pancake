@@ -75,19 +75,19 @@ fn tokenize<'a>(s: &'a mut &str) -> Vec<Token<'a>> {
     tokens
 }
 
-fn parse_expr3<'a, I>(tokens: &mut I) -> i32
+fn parse_expr3<'a, I>(tokens: &mut I, token: &Token) -> i32
 where
     I: Iterator<Item = &'a Token<'a>>,
 {
-    match tokens.next().unwrap() {
+    match token {
         Token::Int(n) => {
             tokens.next();
             *n as i32
         }
         Token::Other('(') => {
-            let token = tokens.next();
-            let val = parse_expr(tokens);
-            match token.unwrap() {
+            let next_token = tokens.next().unwrap();
+            let val = parse_expr(tokens, next_token);
+            match next_token {
                 Token::Other(')') => {
                     tokens.next();
                 }
@@ -99,35 +99,35 @@ where
     }
 }
 
-fn parse_expr2<'a, I>(tokens: &mut I) -> i32
+fn parse_expr2<'a, I>(tokens: &mut I, token: &Token) -> i32
 where
     I: Iterator<Item = &'a Token<'a>>,
 {
-    match tokens.next().unwrap() {
+    match token {
         Token::Other('+') => {
-            tokens.next();
-            parse_expr2(tokens)
+            let next_token = tokens.next().unwrap();
+            parse_expr2(tokens, next_token)
         }
         Token::Other('-') => {
-            tokens.next();
-            -parse_expr2(tokens)
+            let next_token = tokens.next().unwrap();
+            -parse_expr2(tokens, next_token)
         }
-        _ => parse_expr3(tokens),
+        _ => parse_expr3(tokens, token),
     }
 }
 
-fn parse_expr1<'a, I>(tokens: &mut I) -> i32
+fn parse_expr1<'a, I>(tokens: &mut I, token: &Token) -> i32
 where
     I: Iterator<Item = &'a Token<'a>>,
 {
-    let mut val = parse_expr2(tokens);
-    match tokens.next().unwrap() {
+    let mut val = parse_expr2(tokens, token);
+    match token {
         Token::Other('*') => {
-            let rval = parse_expr2(tokens);
+            let rval = parse_expr2(tokens, token);
             val *= rval;
         }
         Token::Other('/') => {
-            let rval = parse_expr2(tokens);
+            let rval = parse_expr2(tokens, token);
             val /= rval;
         }
         _ => {}
@@ -135,18 +135,18 @@ where
     val
 }
 
-fn parse_expr0<'a, I>(tokens: &mut I) -> i32
+fn parse_expr0<'a, I>(tokens: &mut I, token: &Token) -> i32
 where
     I: Iterator<Item = &'a Token<'a>>,
 {
-    let mut val = parse_expr1(tokens);
+    let mut val = parse_expr1(tokens, token);
     match tokens.next().unwrap() {
         Token::Other('+') => {
-            let rval = parse_expr1(tokens);
+            let rval = parse_expr1(tokens, token);
             val += rval;
         }
         Token::Other('-') => {
-            let rval = parse_expr1(tokens);
+            let rval = parse_expr1(tokens, token);
             val -= rval;
         }
         _ => {}
@@ -154,22 +154,24 @@ where
     val
 }
 
-fn parse_expr<'a, I>(tokens: &mut I) -> i32
+fn parse_expr<'a, I>(tokens: &mut I, token: &Token) -> i32
 where
     I: Iterator<Item = &'a Token<'a>>,
 {
-    parse_expr0(tokens)
+    parse_expr0(tokens, token)
 }
 
 fn parse_expr_str(expr: &str) -> i32 {
     let mut stream = expr;
     let tokens = tokenize(&mut stream);
     let mut iter = tokens.iter();
-    parse_expr(&mut iter)
+    let mut token = iter.clone();
+    let token1 = token.next().unwrap();
+    parse_expr(&mut iter, token1)
 }
 
 fn main() {
-    parse_expr_str("1+1");
+    println!("Result: {}", parse_expr_str("1+1"));
 }
 
 #[cfg(test)]
