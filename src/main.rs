@@ -80,10 +80,7 @@ where
     I: Iterator<Item = &'a Token<'a>>,
 {
     match token {
-        Token::Int(n) => {
-            tokens.next();
-            *n as i32
-        }
+        Token::Int(n) => *n as i32,
         Token::Other('(') => {
             let next_token = tokens.next().unwrap();
             let val = parse_expr(tokens, next_token);
@@ -121,16 +118,22 @@ where
     I: Iterator<Item = &'a Token<'a>>,
 {
     let mut val = parse_expr2(tokens, token);
-    match token {
-        Token::Other('*') => {
-            let rval = parse_expr2(tokens, token);
-            val *= rval;
+    while let Some(token) = tokens.peekable().peek() {
+        match token {
+            Token::Other('*') => {
+                let next_token = tokens.next().unwrap();
+                let rval = parse_expr2(tokens, next_token);
+                val *= rval;
+            }
+            Token::Other('/') => {
+                let next_token = tokens.next().unwrap();
+                let rval = parse_expr2(tokens, next_token);
+                val /= rval;
+            }
+            _ => {
+                break;
+            }
         }
-        Token::Other('/') => {
-            let rval = parse_expr2(tokens, token);
-            val /= rval;
-        }
-        _ => {}
     }
     val
 }
@@ -140,16 +143,22 @@ where
     I: Iterator<Item = &'a Token<'a>>,
 {
     let mut val = parse_expr1(tokens, token);
-    match tokens.next().unwrap() {
-        Token::Other('+') => {
-            let rval = parse_expr1(tokens, token);
-            val += rval;
+    while let Some(token) = tokens.peekable().peek() {
+        match token {
+            Token::Other('+') => {
+                let next_token = tokens.next().unwrap();
+                let rval = parse_expr1(tokens, next_token);
+                val += rval;
+            }
+            Token::Other('-') => {
+                let next_token = tokens.next().unwrap();
+                let rval = parse_expr1(tokens, next_token);
+                val -= rval;
+            }
+            _ => {
+                break;
+            }
         }
-        Token::Other('-') => {
-            let rval = parse_expr1(tokens, token);
-            val -= rval;
-        }
-        _ => {}
     }
     val
 }
@@ -171,7 +180,7 @@ fn parse_expr_str(expr: &str) -> i32 {
 }
 
 fn main() {
-    println!("Result: {}", parse_expr_str("1+1"));
+    println!("Result: {}", parse_expr_str("5-7"));
 }
 
 #[cfg(test)]
