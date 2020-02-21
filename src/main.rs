@@ -21,17 +21,21 @@ fn str_intern_range<'a>(interns: &mut Vec<InternStr<'a>>, str: &'a str) -> &'a s
     &str
 }
 
+pub trait PeekableIterator: std::iter::Iterator {
+    fn peek(&mut self) -> Option<&Self::Item>;
+}
+
+impl<I: std::iter::Iterator> PeekableIterator for std::iter::Peekable<I> {
+    fn peek(&mut self) -> Option<&Self::Item> {
+        std::iter::Peekable::peek(self)
+    }
+}
+
 #[derive(Debug, PartialEq)]
 enum Token<'a> {
     Int(u64),
     Name(&'a str),
     Other(char),
-}
-
-impl fmt::Display for Token<'_> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{:?}", self)
-    }
 }
 
 fn tokenize<'a>(s: &'a mut &str) -> Vec<Token<'a>> {
@@ -67,6 +71,7 @@ fn tokenize<'a>(s: &'a mut &str) -> Vec<Token<'a>> {
                 }
                 tokens.push(Token::Name(&s[i as usize..k as usize]));
             }
+            b' ' => {}
             _ => {
                 tokens.push(Token::Other(c));
             }
@@ -75,16 +80,19 @@ fn tokenize<'a>(s: &'a mut &str) -> Vec<Token<'a>> {
     tokens
 }
 
-fn parse_expr3<'a, I>(tokens: &mut I, token: &Token) -> i32
+fn parse_expr3<'a, I>(tokens: &mut I) -> i32
 where
-    I: Iterator<Item = &'a Token<'a>>,
+    I: PeekableIterator<Item = &'a Token<'a>>,
 {
-    match token {
-        Token::Int(n) => *n as i32,
+    match tokens.peek().unwrap() {
+        Token::Int(n) => {
+            tokens.next();
+            *n as i32
+        }
         Token::Other('(') => {
-            let next_token = tokens.next().unwrap();
-            let val = parse_expr(tokens, next_token);
-            match next_token {
+            tokens.next();
+            let val = parse_expr(tokens);
+            match tokens.peek().unwrap() {
                 Token::Other(')') => {
                     tokens.next();
                 }
@@ -96,38 +104,38 @@ where
     }
 }
 
-fn parse_expr2<'a, I>(tokens: &mut I, token: &Token) -> i32
+fn parse_expr2<'a, I>(tokens: &mut I) -> i32
 where
-    I: Iterator<Item = &'a Token<'a>>,
+    I: PeekableIterator<Item = &'a Token<'a>>,
 {
-    match token {
+    match tokens.peek().unwrap() {
         Token::Other('+') => {
-            let next_token = tokens.next().unwrap();
-            parse_expr2(tokens, next_token)
+            tokens.next();
+            parse_expr2(tokens)
         }
         Token::Other('-') => {
-            let next_token = tokens.next().unwrap();
-            -parse_expr2(tokens, next_token)
+            tokens.next();
+            -parse_expr2(tokens)
         }
-        _ => parse_expr3(tokens, token),
+        _ => parse_expr3(tokens),
     }
 }
 
-fn parse_expr1<'a, I>(tokens: &mut I, token: &Token) -> i32
+fn parse_expr1<'a, I>(tokens: &mut I) -> i32
 where
-    I: Iterator<Item = &'a Token<'a>>,
+    I: PeekableIterator<Item = &'a Token<'a>>,
 {
-    let mut val = parse_expr2(tokens, token);
-    while let Some(token) = tokens.peekable().peek() {
+    let mut val = parse_expr2(tokens);
+    while let Some(token) = tokens.peek() {
         match token {
             Token::Other('*') => {
-                let next_token = tokens.next().unwrap();
-                let rval = parse_expr2(tokens, next_token);
+                tokens.next();
+                let rval = parse_expr2(tokens);
                 val *= rval;
             }
             Token::Other('/') => {
-                let next_token = tokens.next().unwrap();
-                let rval = parse_expr2(tokens, next_token);
+                tokens.next();
+                let rval = parse_expr2(tokens);
                 val /= rval;
             }
             _ => {
@@ -138,21 +146,21 @@ where
     val
 }
 
-fn parse_expr0<'a, I>(tokens: &mut I, token: &Token) -> i32
+fn parse_expr0<'a, I>(tokens: &mut I) -> i32
 where
-    I: Iterator<Item = &'a Token<'a>>,
+    I: PeekableIterator<Item = &'a Token<'a>>,
 {
-    let mut val = parse_expr1(tokens, token);
-    while let Some(token) = tokens.peekable().peek() {
+    let mut val = parse_expr1(tokens);
+    while let Some(token) = tokens.peek() {
         match token {
             Token::Other('+') => {
-                let next_token = tokens.next().unwrap();
-                let rval = parse_expr1(tokens, next_token);
+                tokens.next();
+                let rval = parse_expr1(tokens);
                 val += rval;
             }
             Token::Other('-') => {
-                let next_token = tokens.next().unwrap();
-                let rval = parse_expr1(tokens, next_token);
+                tokens.next();
+                let rval = parse_expr1(tokens);
                 val -= rval;
             }
             _ => {
@@ -163,25 +171,21 @@ where
     val
 }
 
-fn parse_expr<'a, I>(tokens: &mut I, token: &Token) -> i32
+fn parse_expr<'a, I>(tokens: &mut I) -> i32
 where
-    I: Iterator<Item = &'a Token<'a>>,
+    I: PeekableIterator<Item = &'a Token<'a>>,
 {
-    parse_expr0(tokens, token)
+    parse_expr0(tokens)
 }
 
 fn parse_expr_str(expr: &str) -> i32 {
     let mut stream = expr;
     let tokens = tokenize(&mut stream);
-    let mut iter = tokens.iter();
-    let mut token = iter.clone();
-    let token1 = token.next().unwrap();
-    parse_expr(&mut iter, token1)
+    let mut iter = tokens.iter().peekable();
+    parse_expr(&mut iter)
 }
 
-fn main() {
-    println!("Result: {}", parse_expr_str("5-7"));
-}
+fn main() {}
 
 #[cfg(test)]
 mod tests {
@@ -217,6 +221,11 @@ mod tests {
 
     #[test]
     fn test_parser() {
-        test_expr!(1 + 1);
+        test_expr!(1+1);
+        test_expr!(10-5);
+        test_expr!(2*5);
+        test_expr!(11*5-2);
+        test_expr!(11*(5-2));
+        test_expr!(10+(20/2));
     }
 }
