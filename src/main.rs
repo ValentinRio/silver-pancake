@@ -193,10 +193,10 @@ mod tests {
 
     #[test]
     fn test_lexer() {
-        let mut stream = "+()_A1,23+!FOO!994 / a25*t1 1 + 1";
+        let mut stream = "+()_A1,23+!FOO!994/a25*t1+1";
         let tokens = tokenize(&mut stream);
         println!("{:?}", tokens);
-        assert!(tokens.len() == 23);
+        assert!(tokens.len() == 17);
     }
 
     #[test]
