@@ -84,23 +84,25 @@ fn parse_expr3<'a, I>(tokens: &mut I) -> i32
 where
     I: PeekableIterator<Item = &'a Token<'a>>,
 {
-    match tokens.peek().unwrap() {
-        Token::Int(n) => {
+    match tokens.peek() {
+        Some(Token::Int(n)) => {
             tokens.next();
             *n as i32
         }
-        Token::Other('(') => {
+        Some(Token::Other('(')) => {
             tokens.next();
             let val = parse_expr(tokens);
-            match tokens.peek().unwrap() {
-                Token::Other(')') => {
+            match tokens.peek() {
+                Some(Token::Other(')')) => {
                     tokens.next();
-                }
+                },
+                None => {}
                 _ => {}
             }
             val
         }
-        _ => panic!("Expected integer or ("),
+        None => panic!("Should not reach EOF"),
+        _ => panic!("Expected integer or (")
     }
 }
 
@@ -108,16 +110,17 @@ fn parse_expr2<'a, I>(tokens: &mut I) -> i32
 where
     I: PeekableIterator<Item = &'a Token<'a>>,
 {
-    match tokens.peek().unwrap() {
-        Token::Other('+') => {
+    match tokens.peek() {
+        Some(Token::Other('+')) => {
             tokens.next();
             parse_expr2(tokens)
         }
-        Token::Other('-') => {
+        Some(Token::Other('-')) => {
             tokens.next();
             -parse_expr2(tokens)
         }
-        _ => parse_expr3(tokens),
+        Some(_) => parse_expr3(tokens),
+        None => panic!("Should not reach EOF")
     }
 }
 
