@@ -99,7 +99,8 @@ where
                             token_mod = TokenMod::TOKENMOD_BIN;
                             base = 2;
                             break;
-                        } else if c.is_digit(10) {
+                        } else if c.to_ascii_lowercase() == 'o' {
+                            chars.next();
                             token_mod = TokenMod::TOKENMOD_OCT;
                             base = 8;
                             break;
@@ -222,7 +223,7 @@ mod tests {
 
     #[test]
     fn test_scan_int_oct() {
-        let str = "0756";
+        let str = "0o756";
         let mut iter = str.chars().peekable();
         let token = scan_int(&mut iter);
         println!("{:?}", token);
