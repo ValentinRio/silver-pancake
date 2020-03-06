@@ -149,10 +149,48 @@ fn scan_float<'a, I>(chars: &mut I) -> Token<'a>
 where
     I: PeekableIterator<Item = char>,
 {
+    let mut val_str = String::from("");
+    while let Some(c) = chars.peek() {
+        if c.is_digit(10) || c.to_ascii_lowercase() == '.' {
+            val_str.push(*c);
+            chars.next();
+        } else {
+            break;
+        }
+    }
+    while let Some(c) = chars.peek() {
+        if c.to_ascii_lowercase() == 'e' {
+            val_str.push(*c);
+            chars.next();
+            while let Some(c1) = chars.peek() {
+                match c1 {
+                    '+' | '-' => {
+                        val_str.push(*c1);
+                        chars.next();
+                    },
+                    _ => {
+                        while let Some(c2) = chars.peek() {
+                            if c2.is_digit(10) {
+                                val_str.push(*c2);
+                                chars.next();
+                            } else {
+                                syntax_error("Expected digit after float literal exponent, found: ", Some(c2));
+                                break;
+                            }
+                        }
+                        break;
+                    }
+                }
+            }
+        } else {
+            break;
+        }
+    }
+    let mut val: f64 = val_str.parse().unwrap();
     Token {
         token_kind: TokenKind::FLOAT,
         token_mod: TokenMod::TOKENMOD_NONE,
-        val: TokenVal::Float(0.0)
+        val: TokenVal::Float(val)
     }
 }
 
@@ -187,6 +225,61 @@ fn tokenize<'a>(s: &'a mut &str) -> Vec<Token<'a>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_scan_float_simple() {
+        let str = "1.56";
+        let mut iter = str.chars().peekable();
+        let token = scan_float(&mut iter);
+        println!("{:?}", token);
+        assert!(token.token_kind == TokenKind::FLOAT);
+        assert!(token.token_mod == TokenMod::TOKENMOD_NONE);
+        assert!(token.val == TokenVal::Float(1.56));
+    }
+
+    #[test]
+    fn test_scan_float_simple2() {
+        let str = ".34";
+        let mut iter = str.chars().peekable();
+        let token = scan_float(&mut iter);
+        println!("{:?}", token);
+        assert!(token.token_kind == TokenKind::FLOAT);
+        assert!(token.token_mod == TokenMod::TOKENMOD_NONE);
+        assert!(token.val == TokenVal::Float(0.34));
+    }
+
+    #[test]
+    fn test_scan_float_simple3() {
+        let str = "45.";
+        let mut iter = str.chars().peekable();
+        let token = scan_float(&mut iter);
+        println!("{:?}", token);
+        assert!(token.token_kind == TokenKind::FLOAT);
+        assert!(token.token_mod == TokenMod::TOKENMOD_NONE);
+        assert!(token.val == TokenVal::Float(45.));
+    }
+
+    #[test]
+    fn test_scan_float_negative_power_of() {
+        let str = "2e-2";
+        let mut iter = str.chars().peekable();
+        let token = scan_float(&mut iter);
+        println!("{:?}", token);
+        assert!(token.token_kind == TokenKind::FLOAT);
+        assert!(token.token_mod == TokenMod::TOKENMOD_NONE);
+        assert!(token.val == TokenVal::Float(0.02));
+    }
+
+    #[test]
+    fn test_scan_float_positive_power_of() {
+        let str = "2e2";
+        let mut iter = str.chars().peekable();
+        let token = scan_float(&mut iter);
+        println!("{:?}", token);
+        assert!(token.token_kind == TokenKind::FLOAT);
+        assert!(token.token_mod == TokenMod::TOKENMOD_NONE);
+        assert!(token.val == TokenVal::Float(200.0));
+    }
 
     #[test]
     fn test_scan_int_dec() {
