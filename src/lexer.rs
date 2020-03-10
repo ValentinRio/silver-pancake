@@ -44,7 +44,7 @@ enum TokenMod {
 enum TokenVal<'a> {
     Int(u64),
     Float(f64),
-    Char(&'a char),
+    Char(char),
     Name(&'a str)
 }
 
@@ -198,11 +198,62 @@ fn escape_to_char(c: char) -> char {
     match c {
         'n' => '\n',
         'r' => '\r',
-        _ => 0 as char
+        _ => '0'
     }
 }
 
-fn scan_char() {}
+fn scan_char<'a, I>(chars: &mut I) -> Token<'a>
+where
+    I: PeekableIterator<Item= char>,
+{
+    let mut val = ' ';
+    chars.next();
+    while let Some(c) = chars.peek() {
+        match c {
+            '\'' =>  {
+                syntax_error("Char literal cannot be empty", None);
+                chars.next();
+                break;
+            }
+            '\n' => {
+                syntax_error("Char literal cannot contain newline", None);
+                break;
+            }
+            '\\' => {
+                chars.next();
+                while let Some(c1) = chars.peek() {
+                    val = escape_to_char(*c1);
+                    if val == '0' {
+                        syntax_error("Invalid char literal escape,", Some(c1));
+                    }
+                    chars.next();
+                    break;
+                }
+                break;
+            }
+            _ => {
+                val = *c;
+                chars.next();
+                break;
+            }
+        }
+    }
+
+    while let Some(c) = chars.peek() {
+        if *c != '\'' {
+            syntax_error("Expected closing char quote,", Some(c));
+            break;
+        } else {
+            chars.next();
+            break;
+        }
+    }
+    Token {
+        token_kind: TokenKind::CHAR,
+        token_mod: TokenMod::TOKENMOD_NONE,
+        val: TokenVal::Char(val)
+    }
+}
 
 fn scan_str() {}
 
@@ -227,9 +278,31 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_scan_char_simple() {
+        let test_case = "'a'";
+        let mut iter = test_case.chars().peekable();
+        let token = scan_char(&mut iter);
+        println!("{:?}", token);
+        assert!(token.token_kind == TokenKind::CHAR);
+        assert!(token.token_mod == TokenMod::TOKENMOD_NONE);
+        assert!(token.val == TokenVal::Char('a'));
+    }
+
+    #[test]
+    fn test_scan_char_simple_escaped() {
+        let test_case = "'\\n'";
+        let mut iter = test_case.chars().peekable();
+        let token = scan_char(&mut iter);
+        println!("{:?}", token);
+        assert!(token.token_kind == TokenKind::CHAR);
+        assert!(token.token_mod == TokenMod::TOKENMOD_NONE);
+        assert!(token.val == TokenVal::Char('\n'));
+    }
+
+    #[test]
     fn test_scan_float_simple() {
-        let str = "1.56";
-        let mut iter = str.chars().peekable();
+        let test_case = "1.56";
+        let mut iter = test_case.chars().peekable();
         let token = scan_float(&mut iter);
         println!("{:?}", token);
         assert!(token.token_kind == TokenKind::FLOAT);
@@ -239,8 +312,8 @@ mod tests {
 
     #[test]
     fn test_scan_float_simple2() {
-        let str = ".34";
-        let mut iter = str.chars().peekable();
+        let test_case = ".34";
+        let mut iter = test_case.chars().peekable();
         let token = scan_float(&mut iter);
         println!("{:?}", token);
         assert!(token.token_kind == TokenKind::FLOAT);
@@ -250,8 +323,8 @@ mod tests {
 
     #[test]
     fn test_scan_float_simple3() {
-        let str = "45.";
-        let mut iter = str.chars().peekable();
+        let test_case = "45.";
+        let mut iter = test_case.chars().peekable();
         let token = scan_float(&mut iter);
         println!("{:?}", token);
         assert!(token.token_kind == TokenKind::FLOAT);
@@ -261,8 +334,8 @@ mod tests {
 
     #[test]
     fn test_scan_float_negative_power_of() {
-        let str = "2.5e-2";
-        let mut iter = str.chars().peekable();
+        let test_case = "2.5e-2";
+        let mut iter = test_case.chars().peekable();
         let token = scan_float(&mut iter);
         println!("{:?}", token);
         assert!(token.token_kind == TokenKind::FLOAT);
@@ -272,8 +345,8 @@ mod tests {
 
     #[test]
     fn test_scan_float_positive_power_of() {
-        let str = "2e2";
-        let mut iter = str.chars().peekable();
+        let test_case = "2e2";
+        let mut iter = test_case.chars().peekable();
         let token = scan_float(&mut iter);
         println!("{:?}", token);
         assert!(token.token_kind == TokenKind::FLOAT);
@@ -283,8 +356,8 @@ mod tests {
 
     #[test]
     fn test_scan_int_dec() {
-        let str = "1234";
-        let mut iter = str.chars().peekable();
+        let test_case = "1234";
+        let mut iter = test_case.chars().peekable();
         let token = scan_int(&mut iter);
         println!("{:?}", token);
         assert!(token.token_kind == TokenKind::INT);
@@ -294,8 +367,8 @@ mod tests {
 
     #[test]
     fn test_scan_int_hexa() {
-        let str = "0x123F";
-        let mut iter = str.chars().peekable();
+        let test_case = "0x123F";
+        let mut iter = test_case.chars().peekable();
         let token = scan_int(&mut iter);
         println!("{:?}", token);
         assert!(token.token_kind == TokenKind::INT);
@@ -305,8 +378,8 @@ mod tests {
 
     #[test]
     fn test_scan_int_bin() {
-        let str = "0b0111001";
-        let mut iter = str.chars().peekable();
+        let test_case = "0b0111001";
+        let mut iter = test_case.chars().peekable();
         let token = scan_int(&mut iter);
         println!("{:?}", token);
         assert!(token.token_kind == TokenKind::INT);
@@ -316,8 +389,8 @@ mod tests {
 
     #[test]
     fn test_scan_int_oct() {
-        let str = "0o756";
-        let mut iter = str.chars().peekable();
+        let test_case = "0o756";
+        let mut iter = test_case.chars().peekable();
         let token = scan_int(&mut iter);
         println!("{:?}", token);
         assert!(token.token_kind == TokenKind::INT);
