@@ -261,13 +261,13 @@ mod tests {
 
     #[test]
     fn test_scan_float_negative_power_of() {
-        let str = "2e-2";
+        let str = "2.5e-2";
         let mut iter = str.chars().peekable();
         let token = scan_float(&mut iter);
         println!("{:?}", token);
         assert!(token.token_kind == TokenKind::FLOAT);
         assert!(token.token_mod == TokenMod::TOKENMOD_NONE);
-        assert!(token.val == TokenVal::Float(0.02));
+        assert!(token.val == TokenVal::Float(0.025));
     }
 
     #[test]
