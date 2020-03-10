@@ -41,18 +41,18 @@ enum TokenMod {
 }
 
 #[derive(Debug, PartialEq)]
-enum TokenVal<'a> {
+enum TokenVal {
     Int(u64),
     Float(f64),
     Char(char),
-    Name(&'a str)
+    Str(String)
 }
 
 #[derive(Debug, PartialEq)]
-struct Token<'a> {
+struct Token {
     token_kind: TokenKind,
     token_mod: TokenMod,
-    val: TokenVal<'a>
+    val: TokenVal
 }
 
 fn char_to_digit(c: &char) -> u64 {
@@ -77,7 +77,7 @@ fn char_to_digit(c: &char) -> u64 {
     }
 }
 
-fn scan_int<'a, I>(chars: &mut I) -> Token<'a>
+fn scan_int<I>(chars: &mut I) -> Token
 where 
     I: PeekableIterator<Item = char>,
 {
@@ -145,7 +145,7 @@ where
     }
 }
 
-fn scan_float<'a, I>(chars: &mut I) -> Token<'a>
+fn scan_float<I>(chars: &mut I) -> Token
 where
     I: PeekableIterator<Item = char>,
 {
@@ -202,7 +202,7 @@ fn escape_to_char(c: char) -> char {
     }
 }
 
-fn scan_char<'a, I>(chars: &mut I) -> Token<'a>
+fn scan_char<I>(chars: &mut I) -> Token
 where
     I: PeekableIterator<Item= char>,
 {
@@ -255,9 +255,48 @@ where
     }
 }
 
-fn scan_str() {}
+fn scan_str<I>(chars: &mut I) -> Token
+where
+    I: PeekableIterator<Item = char>, 
+{
+    chars.next();
+    let mut str = String::from("");
+    while let Some(c) = chars.peek() {
+        if *c != '"' {
+            let mut val = *c;
+            if val == '\n' {
+                syntax_error("String literal cannot contain newline", None)
+            } else if val == '\\' {
+                if let Some(c) = chars.next() {
+                    val = escape_to_char(c);
+                    if val == '0' {
+                        syntax_error("Invalid string literal escape, ", Some(&c));
+                    }
+                }
+            }
+            str.push(val);
+            chars.next();
+        } else {
+            break;
+        }
+    }
+    if let Some(c) = chars.peek() {
+        if *c == '"' {
+            chars.next();
+        } else {
+            syntax_error("Unexpected end of file within string literal", None);
+        }
+    } else {
+        syntax_error("Unexpected end of file within string literal", None);
+    }
+    Token {
+        token_kind: TokenKind::STR,
+        token_mod: TokenMod::TOKENMOD_NONE,
+        val: TokenVal::Str(str)
+    }
+}
 
-fn tokenize<'a>(s: &'a mut &str) -> Vec<Token<'a>> {
+fn tokenize(s: &mut &str) -> Vec<Token> {
     let mut tokens = vec![];
     let mut iter = s.chars().peekable();
 
@@ -276,6 +315,17 @@ fn tokenize<'a>(s: &'a mut &str) -> Vec<Token<'a>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_scan_str_simple() {
+        let test_case = "\"foo\"";
+        let mut iter = test_case.chars().peekable();
+        let token = scan_str(&mut iter);
+        println!("{:?}", token);
+        assert!(token.token_kind == TokenKind::STR);
+        assert!(token.token_mod == TokenMod::TOKENMOD_NONE);
+        assert!(token.val == TokenVal::Str(String::from("foo")));
+    }
 
     #[test]
     fn test_scan_char_simple() {
