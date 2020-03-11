@@ -328,6 +328,17 @@ mod tests {
     }
 
     #[test]
+    fn test_scan_str_escaped() {
+        let test_case = "\"a\nb\"";
+        let mut iter = test_case.chars().peekable();
+        let token = scan_str(&mut iter);
+        println!("{:?}", token);
+        assert!(token.token_kind == TokenKind::STR);
+        assert!(token.token_mod == TokenMod::TOKENMOD_NONE);
+        assert!(token.val == TokenVal::Str(String::from("a\nb")));
+    }
+
+    #[test]
     fn test_scan_char_simple() {
         let test_case = "'a'";
         let mut iter = test_case.chars().peekable();
