@@ -1,5 +1,8 @@
+#[allow(unused_imports)]
 use crate::common::{fatal_error, syntax_error, PeekableIterator};
 
+#[allow(non_camel_case_types)]
+#[allow(dead_code)]
 #[derive(Debug, PartialEq)]
 enum TokenKind {
     EOF,
@@ -31,6 +34,7 @@ enum TokenKind {
     MOD_ASSIGN,
 }
 
+#[allow(non_camel_case_types)]
 #[derive(Debug, PartialEq)]
 enum TokenMod {
     TOKENMOD_NONE,
@@ -40,6 +44,7 @@ enum TokenMod {
     TOKENMOD_CHAR,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, PartialEq)]
 enum TokenVal {
     Int(u64),
@@ -55,6 +60,7 @@ struct Token {
     val: TokenVal
 }
 
+#[allow(dead_code)]
 fn char_to_digit(c: &char) -> u64 {
     match c {
         '0' => 0,
@@ -77,6 +83,7 @@ fn char_to_digit(c: &char) -> u64 {
     }
 }
 
+#[allow(dead_code)]
 fn scan_int<I>(chars: &mut I) -> Token
 where 
     I: PeekableIterator<Item = char>,
@@ -145,6 +152,7 @@ where
     }
 }
 
+#[allow(dead_code)]
 fn scan_float<I>(chars: &mut I) -> Token
 where
     I: PeekableIterator<Item = char>,
@@ -186,7 +194,8 @@ where
             break;
         }
     }
-    let mut val: f64 = val_str.parse().unwrap();
+    println!("val_str {}", val_str);
+    let val: f64 = val_str.parse().unwrap();
     Token {
         token_kind: TokenKind::FLOAT,
         token_mod: TokenMod::TOKENMOD_NONE,
@@ -194,6 +203,7 @@ where
     }
 }
 
+#[allow(dead_code)]
 fn escape_to_char(c: char) -> char {
     match c {
         'n' => '\n',
@@ -202,6 +212,7 @@ fn escape_to_char(c: char) -> char {
     }
 }
 
+#[allow(dead_code)]
 fn scan_char<I>(chars: &mut I) -> Token
 where
     I: PeekableIterator<Item= char>,
@@ -250,11 +261,12 @@ where
     }
     Token {
         token_kind: TokenKind::CHAR,
-        token_mod: TokenMod::TOKENMOD_NONE,
+        token_mod: TokenMod::TOKENMOD_CHAR,
         val: TokenVal::Char(val)
     }
 }
 
+#[allow(dead_code)]
 fn scan_str<I>(chars: &mut I) -> Token
 where
     I: PeekableIterator<Item = char>, 
@@ -296,16 +308,56 @@ where
     }
 }
 
+#[allow(dead_code)]
 fn tokenize(s: &mut &str) -> Vec<Token> {
     let mut tokens = vec![];
     let mut iter = s.chars().peekable();
 
     while let Some(c) = iter.peek() {
         match *c as u8 {
+            b' ' | b'\\' | b'\r' => {
+                iter.next();
+            }
+            b'\'' => {
+                tokens.push(scan_char(&mut iter));
+            }
+            b'"' => {
+                tokens.push(scan_str(&mut iter));
+            }
+            b'.' => {
+                tokens.push(scan_float(&mut iter));
+            }
             b'0'..=b'9' => {
-                let token = scan_int(&mut iter);
-                tokens.push(token)
-            },
+                let mut clone = iter.clone();
+                while let Some(c) = clone.peek() {
+                    if c.is_digit(10) {
+                        clone.next();
+                        continue;
+                    }
+                    if c.to_ascii_lowercase() == '.' || c.to_ascii_lowercase() == 'e' {
+                        tokens.push(scan_float(&mut iter));
+                    } else {
+                        tokens.push(scan_int(&mut iter));
+                    }
+                    break;
+                }
+            }
+            b'A'..=b'z' => {
+                let mut name = String::from("");
+                while let Some(c) = iter.peek() {
+                    if c.is_alphabetic() || c.is_digit(10) {
+                        name.push(*c);
+                        iter.next();
+                    } else {
+                        break;
+                    }
+                }
+                tokens.push(Token {
+                    token_kind: TokenKind::NAME,
+                    token_mod: TokenMod::TOKENMOD_NONE,
+                    val: TokenVal::Str(name)
+                });
+            }
             _ => {}
         }
     }
@@ -315,6 +367,28 @@ fn tokenize(s: &mut &str) -> Vec<Token> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_tokenize() {
+        let mut test_case = "\"foo\" toto 12.56 0x123F '\\n'";
+        let tokens = tokenize(&mut test_case);
+        println!("{:?}", tokens);
+        assert!(tokens[0].token_kind == TokenKind::STR);
+        assert!(tokens[0].token_mod == TokenMod::TOKENMOD_NONE);
+        assert!(tokens[0].val == TokenVal::Str(String::from("foo")));
+        assert!(tokens[1].token_kind == TokenKind::NAME);
+        assert!(tokens[1].token_mod == TokenMod::TOKENMOD_NONE);
+        assert!(tokens[1].val == TokenVal::Str(String::from("toto")));
+        assert!(tokens[2].token_kind == TokenKind::FLOAT);
+        assert!(tokens[2].token_mod == TokenMod::TOKENMOD_NONE);
+        assert!(tokens[2].val == TokenVal::Float(12.56));
+        assert!(tokens[3].token_kind == TokenKind::INT);
+        assert!(tokens[3].token_mod == TokenMod::TOKENMOD_HEX);
+        assert!(tokens[3].val == TokenVal::Int(4671));
+        assert!(tokens[4].token_kind == TokenKind::CHAR);
+        assert!(tokens[4].token_mod == TokenMod::TOKENMOD_CHAR);
+        assert!(tokens[4].val == TokenVal::Char('\n'));
+    }
 
     #[test]
     fn test_scan_str_simple() {
@@ -345,7 +419,7 @@ mod tests {
         let token = scan_char(&mut iter);
         println!("{:?}", token);
         assert!(token.token_kind == TokenKind::CHAR);
-        assert!(token.token_mod == TokenMod::TOKENMOD_NONE);
+        assert!(token.token_mod == TokenMod::TOKENMOD_CHAR);
         assert!(token.val == TokenVal::Char('a'));
     }
 
@@ -356,7 +430,7 @@ mod tests {
         let token = scan_char(&mut iter);
         println!("{:?}", token);
         assert!(token.token_kind == TokenKind::CHAR);
-        assert!(token.token_mod == TokenMod::TOKENMOD_NONE);
+        assert!(token.token_mod == TokenMod::TOKENMOD_CHAR);
         assert!(token.val == TokenVal::Char('\n'));
     }
 

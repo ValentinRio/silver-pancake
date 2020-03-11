@@ -5,6 +5,7 @@ struct InternStr<'a> {
     str: &'a str,
 }
 
+#[allow(dead_code)]
 fn str_intern_range<'a>(interns: &mut Vec<InternStr<'a>>, str: &'a str) -> &'a str {
     let len = str.len();
     for i in 0..interns.len() {
@@ -20,6 +21,7 @@ fn str_intern_range<'a>(interns: &mut Vec<InternStr<'a>>, str: &'a str) -> &'a s
     &str
 }
 
+#[allow(dead_code)]
 pub fn fatal_error(err: &str, c: Option<&char>) {
     if c != None {
         panic!("Fatal error: {} caused by char: {}", err, c.unwrap());
