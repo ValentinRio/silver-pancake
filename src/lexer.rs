@@ -32,12 +32,12 @@ enum TokenKind {
     MUL_ASSIGN,
     DIV_ASSIGN,
     MOD_ASSIGN,
+    LAST_CHAR(char)
 }
 
 #[allow(non_camel_case_types)]
 #[derive(Debug, PartialEq)]
 enum TokenMod {
-    TOKENMOD_NONE,
     TOKENMOD_HEX,
     TOKENMOD_BIN,
     TOKENMOD_OCT,
@@ -56,8 +56,8 @@ enum TokenVal {
 #[derive(Debug, PartialEq)]
 struct Token {
     token_kind: TokenKind,
-    token_mod: TokenMod,
-    val: TokenVal
+    token_mod: Option<TokenMod>,
+    val: Option<TokenVal>
 }
 
 #[allow(dead_code)]
@@ -89,7 +89,7 @@ where
     I: PeekableIterator<Item = char>,
 {
     let mut base = 10;
-    let mut token_mod = TokenMod::TOKENMOD_NONE;
+    let mut token_mod = None;
     while let Some(c) = chars.peek() {
         match c {
             '0' => {
@@ -98,17 +98,17 @@ where
                     Some(c) => {
                         if c.to_ascii_lowercase() == 'x' {
                             chars.next();
-                            token_mod = TokenMod::TOKENMOD_HEX;
+                            token_mod = Some(TokenMod::TOKENMOD_HEX);
                             base = 16;
                             break;
                         } else if c.to_ascii_lowercase() == 'b' {
                             chars.next();
-                            token_mod = TokenMod::TOKENMOD_BIN;
+                            token_mod = Some(TokenMod::TOKENMOD_BIN);
                             base = 2;
                             break;
                         } else if c.to_ascii_lowercase() == 'o' {
                             chars.next();
-                            token_mod = TokenMod::TOKENMOD_OCT;
+                            token_mod = Some(TokenMod::TOKENMOD_OCT);
                             base = 8;
                             break;
                         }
@@ -148,7 +148,7 @@ where
     Token {
         token_kind: TokenKind::INT,
         token_mod: token_mod,
-        val: TokenVal::Int(val)
+        val: Some(TokenVal::Int(val))
     }
 }
 
@@ -194,12 +194,11 @@ where
             break;
         }
     }
-    println!("val_str {}", val_str);
     let val: f64 = val_str.parse().unwrap();
     Token {
         token_kind: TokenKind::FLOAT,
-        token_mod: TokenMod::TOKENMOD_NONE,
-        val: TokenVal::Float(val)
+        token_mod: None,
+        val: Some(TokenVal::Float(val))
     }
 }
 
@@ -261,8 +260,8 @@ where
     }
     Token {
         token_kind: TokenKind::CHAR,
-        token_mod: TokenMod::TOKENMOD_CHAR,
-        val: TokenVal::Char(val)
+        token_mod: Some(TokenMod::TOKENMOD_CHAR),
+        val: Some(TokenVal::Char(val))
     }
 }
 
@@ -303,8 +302,8 @@ where
     }
     Token {
         token_kind: TokenKind::STR,
-        token_mod: TokenMod::TOKENMOD_NONE,
-        val: TokenVal::Str(str)
+        token_mod: None,
+        val: Some(TokenVal::Str(str))
     }
 }
 
@@ -314,20 +313,21 @@ fn tokenize(s: &mut &str) -> Vec<Token> {
     let mut iter = s.chars().peekable();
 
     while let Some(c) = iter.peek() {
-        match *c as u8 {
-            b' ' | b'\\' | b'\r' => {
+        //println!("{}", c);
+        match *c {
+            ' ' | '\\' | '\r' => {
                 iter.next();
             }
-            b'\'' => {
+            '\'' => {
                 tokens.push(scan_char(&mut iter));
             }
-            b'"' => {
+            '"' => {
                 tokens.push(scan_str(&mut iter));
             }
-            b'.' => {
+            '.' => {
                 tokens.push(scan_float(&mut iter));
             }
-            b'0'..=b'9' => {
+            '0'..='9' => {
                 let mut clone = iter.clone();
                 while let Some(c) = clone.peek() {
                     if c.is_digit(10) {
@@ -342,7 +342,7 @@ fn tokenize(s: &mut &str) -> Vec<Token> {
                     break;
                 }
             }
-            b'A'..=b'z' => {
+            'A'..='z' => {
                 let mut name = String::from("");
                 while let Some(c) = iter.peek() {
                     if c.is_alphabetic() || c.is_digit(10) {
@@ -354,8 +354,56 @@ fn tokenize(s: &mut &str) -> Vec<Token> {
                 }
                 tokens.push(Token {
                     token_kind: TokenKind::NAME,
-                    token_mod: TokenMod::TOKENMOD_NONE,
-                    val: TokenVal::Str(name)
+                    token_mod: None,
+                    val: Some(TokenVal::Str(name))
+                });
+            }
+            '<' => {
+                let mut token_kind = TokenKind::LAST_CHAR(*c);
+                iter.next();
+                if let Some(c) = iter.next() {
+                    if c == '<' {
+                        token_kind = TokenKind::LSHIFT;
+                        if let Some(c) = iter.next() {
+                            if c == '=' {
+                                token_kind = TokenKind::LSHIFT_ASSIGN;
+                                iter.next();
+
+                            }
+                        }
+                    } else if c == '=' {
+                        token_kind = TokenKind::LTEQ;
+                        iter.next();
+                    }
+                }
+                tokens.push(Token {
+                    token_kind: token_kind,
+                    token_mod: None,
+                    val: None
+                });
+            }
+            '>' => {
+                let mut token_kind = TokenKind::LAST_CHAR(*c);
+                iter.next();
+                if let Some(c) = iter.next() {
+                    if c == '>' {
+                        token_kind = TokenKind::RSHIFT;
+                        if let Some(c) = iter.next() {
+                            if c == '=' {
+                                token_kind = TokenKind::RSHIFT_ASSIGN;
+                                iter.next();
+
+                            }
+                        }
+                    } else if c == '=' {
+                        token_kind = TokenKind::GTEQ;
+                        iter.next();
+                    }
+                }
+                tokens.push(Token {
+                    token_kind: token_kind,
+                    token_mod: None,
+                    val: None
                 });
             }
             _ => {}
@@ -370,24 +418,90 @@ mod tests {
 
     #[test]
     fn test_tokenize() {
-        let mut test_case = "\"foo\" toto 12.56 0x123F '\\n'";
+        let mut test_case = "\"foo\" toto 12.56 0x123F '\\n' >>= >=";
         let tokens = tokenize(&mut test_case);
         println!("{:?}", tokens);
         assert!(tokens[0].token_kind == TokenKind::STR);
-        assert!(tokens[0].token_mod == TokenMod::TOKENMOD_NONE);
-        assert!(tokens[0].val == TokenVal::Str(String::from("foo")));
+        assert!(tokens[0].token_mod == None);
+        assert!(tokens[0].val == Some(TokenVal::Str(String::from("foo"))));
         assert!(tokens[1].token_kind == TokenKind::NAME);
-        assert!(tokens[1].token_mod == TokenMod::TOKENMOD_NONE);
-        assert!(tokens[1].val == TokenVal::Str(String::from("toto")));
+        assert!(tokens[1].token_mod == None);
+        assert!(tokens[1].val == Some(TokenVal::Str(String::from("toto"))));
         assert!(tokens[2].token_kind == TokenKind::FLOAT);
-        assert!(tokens[2].token_mod == TokenMod::TOKENMOD_NONE);
-        assert!(tokens[2].val == TokenVal::Float(12.56));
+        assert!(tokens[2].token_mod == None);
+        assert!(tokens[2].val == Some(TokenVal::Float(12.56)));
         assert!(tokens[3].token_kind == TokenKind::INT);
-        assert!(tokens[3].token_mod == TokenMod::TOKENMOD_HEX);
-        assert!(tokens[3].val == TokenVal::Int(4671));
+        assert!(tokens[3].token_mod == Some(TokenMod::TOKENMOD_HEX));
+        assert!(tokens[3].val == Some(TokenVal::Int(4671)));
         assert!(tokens[4].token_kind == TokenKind::CHAR);
-        assert!(tokens[4].token_mod == TokenMod::TOKENMOD_CHAR);
-        assert!(tokens[4].val == TokenVal::Char('\n'));
+        assert!(tokens[4].token_mod == Some(TokenMod::TOKENMOD_CHAR));
+        assert!(tokens[4].val == Some(TokenVal::Char('\n')));
+        assert!(tokens[5].token_kind == TokenKind::RSHIFT_ASSIGN);
+        assert!(tokens[5].token_mod == None);
+        assert!(tokens[5].val == None);
+        assert!(tokens[6].token_kind == TokenKind::GTEQ);
+        assert!(tokens[6].token_mod == None);
+        assert!(tokens[6].val == None);
+    }
+
+    #[test]
+    fn test_gt() {
+        let mut test_case = ">";
+        let tokens = tokenize(&mut test_case);
+        println!("{:?}", tokens[0]);
+        assert!(tokens[0].token_kind == TokenKind::LAST_CHAR('>'));
+        assert!(tokens[0].token_mod == None);
+        assert!(tokens[0].val == None);
+    }
+
+    #[test]
+    fn test_rshift() {
+        let mut test_case = ">>";
+        let tokens = tokenize(&mut test_case);
+        println!("{:?}", tokens[0]);
+        assert!(tokens[0].token_kind == TokenKind::RSHIFT);
+        assert!(tokens[0].token_mod == None);
+        assert!(tokens[0].val == None);
+    }
+
+    #[test]
+    fn test_rshift_assign() {
+        let mut test_case = ">>=";
+        let tokens = tokenize(&mut test_case);
+        println!("{:?}", tokens[0]);
+        assert!(tokens[0].token_kind == TokenKind::RSHIFT_ASSIGN);
+        assert!(tokens[0].token_mod == None);
+        assert!(tokens[0].val == None);
+    }
+
+    #[test]
+    fn test_lt() {
+        let mut test_case = "<";
+        let tokens = tokenize(&mut test_case);
+        println!("{:?}", tokens[0]);
+        assert!(tokens[0].token_kind == TokenKind::LAST_CHAR('<'));
+        assert!(tokens[0].token_mod == None);
+        assert!(tokens[0].val == None);
+    }
+
+    #[test]
+    fn test_lshift() {
+        let mut test_case = "<<";
+        let tokens = tokenize(&mut test_case);
+        println!("{:?}", tokens[0]);
+        assert!(tokens[0].token_kind == TokenKind::LSHIFT);
+        assert!(tokens[0].token_mod == None);
+        assert!(tokens[0].val == None);
+    }
+
+    #[test]
+    fn test_lshift_assign() {
+        let mut test_case = "<<=";
+        let tokens = tokenize(&mut test_case);
+        println!("{:?}", tokens[0]);
+        assert!(tokens[0].token_kind == TokenKind::LSHIFT_ASSIGN);
+        assert!(tokens[0].token_mod == None);
+        assert!(tokens[0].val == None);
     }
 
     #[test]
@@ -397,8 +511,8 @@ mod tests {
         let token = scan_str(&mut iter);
         println!("{:?}", token);
         assert!(token.token_kind == TokenKind::STR);
-        assert!(token.token_mod == TokenMod::TOKENMOD_NONE);
-        assert!(token.val == TokenVal::Str(String::from("foo")));
+        assert!(token.token_mod == None);
+        assert!(token.val == Some(TokenVal::Str(String::from("foo"))));
     }
 
     #[test]
@@ -408,8 +522,8 @@ mod tests {
         let token = scan_str(&mut iter);
         println!("{:?}", token);
         assert!(token.token_kind == TokenKind::STR);
-        assert!(token.token_mod == TokenMod::TOKENMOD_NONE);
-        assert!(token.val == TokenVal::Str(String::from("a\nb")));
+        assert!(token.token_mod == None);
+        assert!(token.val == Some(TokenVal::Str(String::from("a\nb"))));
     }
 
     #[test]
@@ -419,8 +533,8 @@ mod tests {
         let token = scan_char(&mut iter);
         println!("{:?}", token);
         assert!(token.token_kind == TokenKind::CHAR);
-        assert!(token.token_mod == TokenMod::TOKENMOD_CHAR);
-        assert!(token.val == TokenVal::Char('a'));
+        assert!(token.token_mod == Some(TokenMod::TOKENMOD_CHAR));
+        assert!(token.val == Some(TokenVal::Char('a')));
     }
 
     #[test]
@@ -430,8 +544,8 @@ mod tests {
         let token = scan_char(&mut iter);
         println!("{:?}", token);
         assert!(token.token_kind == TokenKind::CHAR);
-        assert!(token.token_mod == TokenMod::TOKENMOD_CHAR);
-        assert!(token.val == TokenVal::Char('\n'));
+        assert!(token.token_mod == Some(TokenMod::TOKENMOD_CHAR));
+        assert!(token.val == Some(TokenVal::Char('\n')));
     }
 
     #[test]
@@ -441,8 +555,8 @@ mod tests {
         let token = scan_float(&mut iter);
         println!("{:?}", token);
         assert!(token.token_kind == TokenKind::FLOAT);
-        assert!(token.token_mod == TokenMod::TOKENMOD_NONE);
-        assert!(token.val == TokenVal::Float(1.56));
+        assert!(token.token_mod == None);
+        assert!(token.val == Some(TokenVal::Float(1.56)));
     }
 
     #[test]
@@ -452,8 +566,8 @@ mod tests {
         let token = scan_float(&mut iter);
         println!("{:?}", token);
         assert!(token.token_kind == TokenKind::FLOAT);
-        assert!(token.token_mod == TokenMod::TOKENMOD_NONE);
-        assert!(token.val == TokenVal::Float(0.34));
+        assert!(token.token_mod == None);
+        assert!(token.val == Some(TokenVal::Float(0.34)));
     }
 
     #[test]
@@ -463,8 +577,8 @@ mod tests {
         let token = scan_float(&mut iter);
         println!("{:?}", token);
         assert!(token.token_kind == TokenKind::FLOAT);
-        assert!(token.token_mod == TokenMod::TOKENMOD_NONE);
-        assert!(token.val == TokenVal::Float(45.));
+        assert!(token.token_mod == None);
+        assert!(token.val == Some(TokenVal::Float(45.)));
     }
 
     #[test]
@@ -474,8 +588,8 @@ mod tests {
         let token = scan_float(&mut iter);
         println!("{:?}", token);
         assert!(token.token_kind == TokenKind::FLOAT);
-        assert!(token.token_mod == TokenMod::TOKENMOD_NONE);
-        assert!(token.val == TokenVal::Float(0.025));
+        assert!(token.token_mod == None);
+        assert!(token.val == Some(TokenVal::Float(0.025)));
     }
 
     #[test]
@@ -485,8 +599,8 @@ mod tests {
         let token = scan_float(&mut iter);
         println!("{:?}", token);
         assert!(token.token_kind == TokenKind::FLOAT);
-        assert!(token.token_mod == TokenMod::TOKENMOD_NONE);
-        assert!(token.val == TokenVal::Float(200.0));
+        assert!(token.token_mod == None);
+        assert!(token.val == Some(TokenVal::Float(200.0)));
     }
 
     #[test]
@@ -496,8 +610,8 @@ mod tests {
         let token = scan_int(&mut iter);
         println!("{:?}", token);
         assert!(token.token_kind == TokenKind::INT);
-        assert!(token.token_mod == TokenMod::TOKENMOD_NONE);
-        assert!(token.val == TokenVal::Int(1234));
+        assert!(token.token_mod == None);
+        assert!(token.val == Some(TokenVal::Int(1234)));
     }
 
     #[test]
@@ -507,8 +621,8 @@ mod tests {
         let token = scan_int(&mut iter);
         println!("{:?}", token);
         assert!(token.token_kind == TokenKind::INT);
-        assert!(token.token_mod == TokenMod::TOKENMOD_HEX);
-        assert!(token.val == TokenVal::Int(4671));
+        assert!(token.token_mod == Some(TokenMod::TOKENMOD_HEX));
+        assert!(token.val == Some(TokenVal::Int(4671)));
     }
 
     #[test]
@@ -518,8 +632,8 @@ mod tests {
         let token = scan_int(&mut iter);
         println!("{:?}", token);
         assert!(token.token_kind == TokenKind::INT);
-        assert!(token.token_mod == TokenMod::TOKENMOD_BIN);
-        assert!(token.val == TokenVal::Int(57));
+        assert!(token.token_mod == Some(TokenMod::TOKENMOD_BIN));
+        assert!(token.val == Some(TokenVal::Int(57)));
     }
 
     #[test]
@@ -529,7 +643,7 @@ mod tests {
         let token = scan_int(&mut iter);
         println!("{:?}", token);
         assert!(token.token_kind == TokenKind::INT);
-        assert!(token.token_mod == TokenMod::TOKENMOD_OCT);
-        assert!(token.val == TokenVal::Int(494));
+        assert!(token.token_mod == Some(TokenMod::TOKENMOD_OCT));
+        assert!(token.val == Some(TokenVal::Int(494)));
     }
 }
