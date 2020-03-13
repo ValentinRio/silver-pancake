@@ -307,6 +307,49 @@ where
     }
 }
 
+macro_rules! CASE1 {
+    ($tokens:expr, $chars:expr, $c:expr, $c1:expr, $k1:expr) => {
+        {
+            let mut token_kind = TokenKind::LAST_CHAR($c);
+            $chars.next();
+            if let Some(c) = $chars.next() {
+                if c == $c1 {
+                    token_kind = $k1;
+                    $chars.next();
+                }
+            } 
+            $tokens.push(Token {
+                token_kind: token_kind,
+                token_mod: None,
+                val: None
+            });
+        }
+    };
+}
+
+macro_rules! CASE2 {
+    ($tokens:expr, $chars:expr, $c:expr, $c1:expr, $k1:expr, $c2:expr, $k2:expr) => {
+        {
+            let mut token_kind = TokenKind::LAST_CHAR($c);
+            $chars.next();
+            if let Some(c) = $chars.next() {
+                if c == $c1 {
+                    token_kind = $k1;
+                    $chars.next();
+                } else if c == $c2 {
+                    token_kind = $k2;
+                    $chars.next();
+                }
+            } 
+            $tokens.push(Token {
+                token_kind: token_kind,
+                token_mod: None,
+                val: None
+            });
+        }
+    };
+}
+
 #[allow(dead_code)]
 fn tokenize(s: &mut &str) -> Vec<Token> {
     let mut tokens = vec![];
@@ -342,7 +385,7 @@ fn tokenize(s: &mut &str) -> Vec<Token> {
                     break;
                 }
             }
-            'A'..='z' => {
+            'A'..='Z' | 'a'..='z' | '_' => {
                 let mut name = String::from("");
                 while let Some(c) = iter.peek() {
                     if c.is_alphabetic() || c.is_digit(10) {
@@ -406,6 +449,15 @@ fn tokenize(s: &mut &str) -> Vec<Token> {
                     val: None
                 });
             }
+            c @ '^' => CASE1!(tokens, iter, c, '=', TokenKind::XOR_ASSIGN),
+            c @ ':' => CASE1!(tokens, iter, c, '=', TokenKind::COLON_ASSIGN),
+            c @ '*' => CASE1!(tokens, iter, c, '=', TokenKind::MUL_ASSIGN),
+            c @ '/' => CASE1!(tokens, iter, c, '=', TokenKind::DIV_ASSIGN),
+            c @ '%' => CASE1!(tokens, iter, c, '=', TokenKind::MOD_ASSIGN),
+            c @ '+' => CASE2!(tokens, iter, c, '=', TokenKind::ADD_ASSIGN, '+', TokenKind::INC),
+            c @ '-' => CASE2!(tokens, iter, c, '=', TokenKind::SUB_ASSIGN, '-', TokenKind::DEC),
+            c @ '&' => CASE2!(tokens, iter, c, '=', TokenKind::AND_ASSIGN, '&', TokenKind::AND),
+            c @ '|' => CASE2!(tokens, iter, c, '=', TokenKind::OR_ASSIGN, '|', TokenKind::OR),
             _ => {}
         }
     }
@@ -418,7 +470,7 @@ mod tests {
 
     #[test]
     fn test_tokenize() {
-        let mut test_case = "\"foo\" toto 12.56 0x123F '\\n' >>= >=";
+        let mut test_case = "\"foo\" toto 12.56 0x123F '\\n' >>= >= &= ++";
         let tokens = tokenize(&mut test_case);
         println!("{:?}", tokens);
         assert!(tokens[0].token_kind == TokenKind::STR);
@@ -442,6 +494,12 @@ mod tests {
         assert!(tokens[6].token_kind == TokenKind::GTEQ);
         assert!(tokens[6].token_mod == None);
         assert!(tokens[6].val == None);
+        assert!(tokens[7].token_kind == TokenKind::AND_ASSIGN);
+        assert!(tokens[7].token_mod == None);
+        assert!(tokens[7].val == None);
+        assert!(tokens[8].token_kind == TokenKind::INC);
+        assert!(tokens[8].token_mod == None);
+        assert!(tokens[8].val == None);
     }
 
     #[test]
